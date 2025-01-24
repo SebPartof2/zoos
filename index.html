@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animal Locator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+        }
+        header {
+            background-color: #4CAF50;
+            color: white;
+            padding: 1rem;
+        }
+        main {
+            padding: 2rem;
+        }
+        input, button {
+            margin: 0.5rem;
+            padding: 0.5rem;
+            font-size: 1rem;
+        }
+        #results {
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Animal Locator</h1>
+        <p>Find which zoos have your favorite animals!</p>
+    </header>
+    <main>
+        <input type="text" id="animalSearch" placeholder="Enter an animal name">
+        <button onclick="searchAnimal()">Search</button>
+        <div id="results"></div>
+    </main>
+
+    <script>
+        async function fetchZooFiles() {
+            const response = await fetch('./zoos/');
+            const text = await response.text();
+            const parser = new DOMParser();
+            const htmlDocument = parser.parseFromString(text, "text/html");
+            const links = htmlDocument.querySelectorAll('a');
+            return Array.from(links)
+                .map(link => link.href)
+                .filter(href => href.endsWith('.json'));
+        }
+
+        async function fetchZoos() {
+            const zooFiles = await fetchZooFiles();
+            const zoos = {};
+
+            for (const file of zooFiles) {
+                const response = await fetch(file);
+                const data = await response.json();
+                const zooName = file.split('/').pop().replace('.json', '');
+                zoos[zooName] = data.animals;
+            }
+
+            return zoos;
+        }
+
+        async function fetchAnimalDetails(animal) {
+            try {
+                const response = await fetch(`./animals/${animal.toLowerCase()}.json`);
+                return await response.json();
+            } catch {
+                return null;
+            }
+        }
+
+        async function searchAnimal() {
+            const query = document.getElementById('animalSearch').value.toLowerCase();
+            const resultsDiv = document.getElementById('results');
+
+            resultsDiv.innerHTML = ""; // Clear previous results
+
+            if (!query) {
+                resultsDiv.innerHTML = "<p>Please enter an animal name to search.</p>";
+                return;
+            }
+
+            const zoos = await fetchZoos();
+            let found = false;
+            resultsDiv.innerHTML = "<h2>Search Results:</h2>";
+
+            for (const [zoo, animals] of Object.entries(zoos)) {
+                if (animals.some(animal => animal.toLowerCase() === query)) {
+                    found = true;
+                    const animalDetails = await fetchAnimalDetails(query);
+                    const detailsLink = animalDetails 
+                        ? `<a href='./animals/${query.toLowerCase()}.html'>${query.charAt(0).toUpperCase() + query.slice(1)}</a>`
+                        : `${query.charAt(0).toUpperCase() + query.slice(1)}`;
+
+                    resultsDiv.innerHTML += `<p>${zoo} has ${detailsLink}</p>`;
+                }
+            }
+
+            if (!found) {
+                resultsDiv.innerHTML += `<p>No zoos found with ${query.charAt(0).toUpperCase() + query.slice(1)}.</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
